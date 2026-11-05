@@ -114,100 +114,115 @@ export default function Onboarding() {
       setIsSubmitting(true);
 
       // ============================================
-      // STEP 1: UPDATE USER CURRENCY
+      // COMPLETE ONBOARDING (ATOMIC RPC OR SAFE FALLBACK)
       // ============================================
 
-      const { error: userError } = await authSupabase
-        .from('users')
-        .update({
-          currency: selectedCurrency,
-        })
-        .eq('clerk_id', user.id);
+      // Attempt atomic single-transaction PostgreSQL function via RPC
+      const { error: rpcError } = await authSupabase.rpc('complete_onboarding', {
+        p_currency: selectedCurrency,
+        p_starting_balance: parsedBalance,
+      });
 
-      if (userError) {
-        console.error('Error updating user currency:', userError);
+      if (rpcError) {
+        // If RPC function is not yet deployed to Supabase (PGRST202 / function not found),
+        // use safe table updates with idempotency protection against double-counting.
+        const isFunctionMissing =
+          rpcError.code === 'PGRST202' ||
+          rpcError.message?.includes('not found') ||
+          rpcError.message?.includes('does not exist');
 
-        Alert.alert('Update Failed', 'Could not save your currency preference. Please try again.');
+        if (isFunctionMissing) {
+          // STEP 1: Update user currency
+          const { error: userError } = await authSupabase
+            .from('users')
+            .update({
+              currency: selectedCurrency,
+            })
+            .eq('clerk_id', user.id);
 
-        return;
-      }
+          if (userError) {
+            console.error('Error updating user currency:', userError);
+            Alert.alert(
+              'Update Failed',
+              'Could not save your currency preference. Please try again.'
+            );
+            return;
+          }
 
-      // ============================================
-      // STEP 2: PROCESS STARTING BALANCE
-      // ============================================
+          // STEP 2: Process starting balance safely
+          if (parsedBalance > 0) {
+            const { data: defaultAccount, error: accountFetchError } = await authSupabase
+              .from('accounts')
+              .select('id, balance')
+              .eq('user_id', user.id)
+              .eq('is_default', true)
+              .maybeSingle();
 
-      // Starting balance is optional.
-      // Skip transaction creation when balance is zero.
+            if (accountFetchError || !defaultAccount) {
+              console.error('Error fetching default account:', accountFetchError);
+              Alert.alert(
+                'Account Error',
+                'Could not find your default cash account. Please try again.'
+              );
+              return;
+            }
 
-      if (parsedBalance > 0) {
-        // Fetch the user's default account
-        const { data: defaultAccount, error: accountFetchError } = await authSupabase
-          .from('accounts')
-          .select('id, balance')
-          .eq('user_id', user.id)
-          .eq('is_default', true)
-          .single();
+            // Check if starting balance transaction already exists to prevent duplicate entries on retry
+            const { data: existingTx } = await authSupabase
+              .from('transactions')
+              .select('id')
+              .eq('user_id', user.id)
+              .eq('account_id', defaultAccount.id)
+              .eq('description', 'Starting balance')
+              .maybeSingle();
 
-        if (accountFetchError || !defaultAccount) {
-          console.error('Error fetching default account:', accountFetchError);
+            if (!existingTx) {
+              const { error: transactionError } = await authSupabase.from('transactions').insert({
+                user_id: user.id,
+                account_id: defaultAccount.id,
+                type: 'INCOME',
+                amount: parsedBalance,
+                category: 'other_income',
+                description: 'Starting balance',
+                date: new Date().toISOString(),
+                input_method: 'MANUAL',
+              });
 
+              if (transactionError) {
+                console.error('Error inserting starting balance transaction:', transactionError);
+                Alert.alert(
+                  'Transaction Failed',
+                  'Could not record your starting balance. Please try again.'
+                );
+                return;
+              }
+
+              const currentBalance = Number(defaultAccount.balance ?? 0);
+              const newBalance = currentBalance + parsedBalance;
+
+              const { error: balanceError } = await authSupabase
+                .from('accounts')
+                .update({
+                  balance: newBalance,
+                })
+                .eq('id', defaultAccount.id);
+
+              if (balanceError) {
+                console.error('Error updating account balance:', balanceError);
+                Alert.alert(
+                  'Balance Update Failed',
+                  'Could not update account balance. Please try again.'
+                );
+                return;
+              }
+            }
+          }
+        } else {
+          console.error('RPC complete_onboarding error:', rpcError);
           Alert.alert(
-            'Account Error',
-            'Could not find your default cash account. Please try again.'
+            'Setup Failed',
+            rpcError.message || 'Could not complete onboarding. Please try again.'
           );
-
-          return;
-        }
-
-        // ============================================
-        // STEP 3: INSERT STARTING BALANCE TRANSACTION
-        // ============================================
-
-        const { error: transactionError } = await authSupabase.from('transactions').insert({
-          user_id: user.id,
-          account_id: defaultAccount.id,
-          type: 'INCOME',
-          amount: parsedBalance,
-          category: 'other_income',
-          description: 'Starting balance',
-          date: new Date().toISOString(),
-          input_method: 'MANUAL',
-        });
-
-        if (transactionError) {
-          console.error('Error inserting starting balance transaction:', transactionError);
-
-          Alert.alert(
-            'Transaction Failed',
-            'Could not record your starting balance. Please try again.'
-          );
-
-          return;
-        }
-
-        // ============================================
-        // STEP 4: UPDATE DEFAULT ACCOUNT BALANCE
-        // ============================================
-
-        const currentBalance = Number(defaultAccount.balance ?? 0);
-
-        const newBalance = currentBalance + parsedBalance;
-
-        const { error: balanceError } = await authSupabase
-          .from('accounts')
-          .update({
-            balance: newBalance,
-          })
-          .eq('id', defaultAccount.id);
-
-        if (balanceError) {
-          console.error('Error updating account balance:', balanceError);
-
-          Alert.alert(
-            'Balance Update Failed',
-            'Your starting balance transaction was recorded, but the account balance could not be updated. Please contact support.'
-          );
-
           return;
         }
       }
@@ -383,7 +398,9 @@ export default function Onboarding() {
             {/* COMPLETE ONBOARDING BUTTON */}
 
             <TouchableOpacity
-              onPress={handleSubmit(handleCompleteOnboarding)}
+              onPress={() => {
+                void handleSubmit(handleCompleteOnboarding)();
+              }}
               disabled={isSubmitting}
               activeOpacity={0.85}
               className={`h-14 flex-row items-center justify-center rounded-2xl bg-primary shadow-md ${

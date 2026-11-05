@@ -48,15 +48,32 @@ const CURRENCY_FLAGS: Record<string, string> = {
 // GENERATE ALL CURRENCIES
 // ============================================
 
+// Exclude non-currencies, testing codes, and precious metals
+const EXCLUDED_CURRENCY_CODES = new Set([
+  'XTS', // Testing currency code
+  'XXX', // No currency
+  'XAU', // Gold
+  'XAG', // Silver
+  'XPD', // Palladium
+  'XPT', // Platinum
+  'XBA', // European Composite Unit
+  'XBB', // European Monetary Unit
+  'XBC', // European Unit of Account 9
+  'XBD', // European Unit of Account 17
+  'XDR', // Special Drawing Rights
+  'XSU', // Sucre
+  'XUA', // ADB Unit of Account
+]);
+
 export const ALL_CURRENCIES: CurrencyOption[] = cc
   .codes()
+  .filter((code) => !EXCLUDED_CURRENCY_CODES.has(code))
   .map((code) => ({
     code,
     name: cc.code(code)?.currency ?? code,
     symbol: getSymbol(code) ?? code,
     flag: CURRENCY_FLAGS[code] ?? '🌐',
-  }))
-  .filter((currency) => currency.symbol !== currency.code);
+  }));
 
 // ============================================
 // DEFAULT CURRENCY

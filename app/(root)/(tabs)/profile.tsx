@@ -71,7 +71,10 @@ export default function ProfileTab() {
   const router = useRouter();
   const { themePreference, resolvedTheme, isDark } = useAppTheme();
   const c = useThemeColors();
-  console.log(user);
+  console.log('CURRENT USER:', JSON.stringify(user, null, 2));
+  console.log("Clerk User ID:", user?.id);
+console.log("User Email:", user?.primaryEmailAddress?.emailAddress);
+console.log("User Name:", user?.fullName);
 
   const fullName = user?.fullName || 'Spendly User';
   const email = user?.primaryEmailAddress?.emailAddress || 'No email available';
