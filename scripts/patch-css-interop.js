@@ -101,8 +101,6 @@ if (fs.existsSync(renderComponentPath)) {
         }`
     );
     fs.writeFileSync(renderComponentPath, content, 'utf8');
-    console.log(
-      '[patch-css-interop] Successfully patched render-component.js with safe stringify'
-    );
+    console.log('[patch-css-interop] Successfully patched render-component.js with safe stringify');
   }
 }
