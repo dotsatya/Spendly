@@ -22,8 +22,24 @@ export default function TabLayout() {
         <NativeTabs.Trigger.Icon sf="house.fill" md="home" />
         <NativeTabs.Trigger.Label>Home</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
+
+      <NativeTabs.Trigger name="transactions">
+        <NativeTabs.Trigger.Icon sf="arrow.left.arrow.right" md="sync_alt" />
+        <NativeTabs.Trigger.Label>Transactions</NativeTabs.Trigger.Label>
+      </NativeTabs.Trigger>
+
+      <NativeTabs.Trigger name="add-transaction">
+        <NativeTabs.Trigger.Icon sf="plus.circle.fill" md="add_circle" />
+        <NativeTabs.Trigger.Label>Add</NativeTabs.Trigger.Label>
+      </NativeTabs.Trigger>
+
+      <NativeTabs.Trigger name="assistant">
+        <NativeTabs.Trigger.Icon sf="bubble.left.and.bubble.right.fill" md="forum" />
+        <NativeTabs.Trigger.Label>Assistant</NativeTabs.Trigger.Label>
+      </NativeTabs.Trigger>
+
       <NativeTabs.Trigger name="profile">
-        <NativeTabs.Trigger.Icon sf="person.fill" md="person" />
+        <NativeTabs.Trigger.Icon sf="person.crop.circle.fill" md="account_circle" />
         <NativeTabs.Trigger.Label>Profile</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
     </NativeTabs>

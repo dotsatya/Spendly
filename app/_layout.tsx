@@ -6,6 +6,9 @@ import { StatusBar } from 'expo-status-bar';
 import { ClerkProvider } from '@clerk/expo';
 import { tokenCache } from '@clerk/expo/token-cache';
 import { THEME, ThemeProvider, useAppTheme } from '@/lib/theme';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { queryClient } from '@/lib/query/client';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY!;
 
@@ -35,12 +38,16 @@ function RootLayoutNav() {
 
 export default function RootLayout() {
   return (
-    <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
-      <SafeAreaProvider>
-        <ThemeProvider>
-          <RootLayoutNav />
-        </ThemeProvider>
-      </SafeAreaProvider>
-    </ClerkProvider>
+    <GestureHandlerRootView style={{ flex: 1 }} >
+      <QueryClientProvider client={queryClient}>
+        <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
+          <SafeAreaProvider>
+            <ThemeProvider>
+              <RootLayoutNav />
+            </ThemeProvider>
+          </SafeAreaProvider>
+        </ClerkProvider>
+      </QueryClientProvider>
+    </GestureHandlerRootView> 
   );
 }
