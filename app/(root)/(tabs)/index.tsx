@@ -22,7 +22,6 @@ export default function HomeTab() {
   const currency = useUserStore((state) => state.currency);
 
   const [budgetModelOpen, setBudgetModelOpen] = useState(false);
-  const [filter, setFilter] = useState('All');
   const [alerts, setAlerts] = useState(true);
 
   const {
@@ -225,29 +224,6 @@ export default function HomeTab() {
             placeholderTextColor={colors.mutedForeground}
           />
         </View>
-
-        {/* ===== FILTER CHIPS ===== */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          className="mt-4"
-          contentContainerStyle={{ paddingHorizontal: 20, gap: 8 }}>
-          {['All', 'House', 'Apartment', 'Villa'].map((item) => {
-            const selected = filter === item;
-            return (
-              <Pressable
-                key={item}
-                onPress={() => setFilter(item)}
-                className={`rounded-full border px-4 py-2 ${
-                  selected ? 'border-transparent bg-primary' : 'border-border bg-background'
-                }`}>
-                <Text className={selected ? 'text-primary-foreground' : 'text-foreground'}>
-                  {item}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
 
         {/* ===== PROPERTY CARD ===== */}
         <View className="mx-5 mt-6 overflow-hidden rounded-lg border border-border bg-card">
