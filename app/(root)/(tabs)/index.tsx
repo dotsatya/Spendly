@@ -1,14 +1,109 @@
-import { useState } from 'react';
-import { View, Text, ScrollView, TextInput, Pressable, Switch } from 'react-native';
+import { useMemo, useState } from 'react';
+import { View, Text, TextInput, Pressable, Switch, TouchableOpacity, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeColors } from '@/lib/theme';
 import { ArrowUpRight, ArrowDownRight, Camera, Mic, Plus } from 'lucide-react-native';
+import { useUser } from '@clerk/expo';
+import { router } from 'expo-router';
+import { useUserStore } from '@/store/userStore';
+import { useAccountsQuery } from '@/hooks/queries/useAccountsQuery';
+import { useTransactionsQuery } from '@/hooks/queries/useTransactionsQuery';
+import { useBudgetQuery } from '@/hooks/queries/useBudgetQuery';
+import { isSameMonth } from 'date-fns';
+import { Transaction } from '@/types';
+import { getCategoryConfig } from '@/constants/categories';
+import { RefreshControl, ScrollView } from 'react-native-gesture-handler';
+import { formatPrice, getGreeting } from '@/lib/utils/utils';
 
 export default function HomeTab() {
   const colors = useThemeColors(); // for icons, placeholder, switch
-  const [filter, setFilter] = useState('All');
+  const { user } = useUser();
+  const currency = useUserStore((state) => state.currency);
+
+  const [budgetModelOpen, setBudgetModelOpen] = useState(false);
   const [alerts, setAlerts] = useState(true);
+
+  const {
+    data: accounts = [],
+    isLoading: accountsLoading,
+    isRefetching: accountsRefetching,
+    refetch: refetchAccounts,
+    isError: accountsError,
+  } = useAccountsQuery();
+
+  const {
+    data: transactions = [],
+    isLoading: transactionsLoading,
+    isRefetching: transactionsRefetching,
+    refetch: transactionsRefetch,
+    isError: transactionsError,
+  } = useTransactionsQuery();
+
+  const { data: budget = [], refetch: refetchBudget, isError: budgetError } = useBudgetQuery();
+
+  const loading = accountsLoading || transactionsLoading;
+  const refetching = accountsRefetching || transactionsRefetching;
+
+  const onRefresh = () => {
+    refetchAccounts();
+    transactionsRefetch();
+    refetchBudget();
+  };
+
+  const totalBalance = useMemo(
+    () => accounts.reduce((sum, account) => sum + account.balance, 0),
+    [accounts]
+  );
+
+  const monthTransactions = useMemo(() => {
+    const now = new Date();
+    const monthTransactions = transactions.filter((tx) => isSameMonth(new Date(tx.date), now));
+    return monthTransactions;
+  }, [transactions]);
+
+  const monthlyIncome = useMemo(
+    () =>
+      monthTransactions
+        .filter((tx) => tx.type === 'INCOME')
+        .reduce((sum, tx) => sum + tx.amount, 0),
+    [monthTransactions]
+  );
+  const monthlyExpense = useMemo(
+    () =>
+      monthTransactions
+        .filter((tx) => tx.type === 'EXPENSE')
+        .reduce((sum, tx) => sum + tx.amount, 0),
+    [monthTransactions]
+  );
+
+  const recentTransactions = useMemo(() => {
+    return transactions.slice(0, 5);
+  }, [transactions]);
+
+  const expensesBreakdown = useMemo(() => {
+    const map: Record<string, number> = {};
+    monthTransactions
+      .filter((tx) => tx.type === 'EXPENSE')
+      .forEach((tx) => {
+        map[tx.category] = map[tx.category] ?? 0 + tx.amount;
+      });
+    return Object.entries(map)
+      .sort((a, b) => b[1] - a[1])
+      .map(([category, amount]) => ({
+        category: category as Transaction['category'],
+        amount,
+        color: getCategoryConfig(category as Transaction['category']).color,
+      }));
+  }, [monthTransactions]);
+  // console.log(totalBalance, monthTransactions);
+
+  const initials =
+    [user?.firstName, user?.lastName]
+      .filter(Boolean)
+      .map((name) => name?.[0])
+      .join('')
+      .toUpperCase() || 'U';
 
   return (
     // 1. Screen background
@@ -16,7 +111,8 @@ export default function HomeTab() {
       <ScrollView
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
-        contentContainerStyle={{ paddingBottom: 32 }}>
+        contentContainerStyle={{ paddingBottom: 32 }}
+        refreshControl={<RefreshControl refreshing={refetching} onRefresh={onRefresh} />}>
         {/* ===== HEADER ===== */}
 
         <View className="overflow-hidden rounded-b-3xl bg-foreground">
@@ -31,24 +127,38 @@ export default function HomeTab() {
             </View>
 
             {/* Greeting + Profile */}
+
             <View className="flex-row items-center gap-3">
               <View className="items-end">
-                <Text className="text-[11px] font-medium text-background/60">Good afternoon</Text>
-                <Text className="text-lg font-bold text-chart-2">User</Text>
+                <Text className="text-[11px] font-medium text-background/60">{getGreeting()}</Text>
+
+                <Text className="text-lg font-bold text-chart-2">{user?.firstName}</Text>
               </View>
 
-              <View className="h-10 w-10 items-center justify-center overflow-hidden rounded-full border-2 border-border bg-card">
-                <Ionicons name="person" size={21} color={colors.mutedForeground} />
-              </View>
+              {/* Avatar */}
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={() => router.push('/(root)/profile')}
+                className="h-10 w-10 items-center justify-center overflow-hidden rounded-full border-2 border-border bg-card">
+                {user?.imageUrl ? (
+                  <Image
+                    source={{ uri: user.imageUrl }}
+                    className="h-full w-full"
+                    resizeMode="cover"
+                  />
+                ) : (
+                  <Text className="text-sm font-bold text-primary">{initials}</Text>
+                )}
+              </TouchableOpacity>
             </View>
           </View>
 
           {/* Balance Overview */}
-          <View className="px-5 py-6">
+          <View className="px-5 py-5">
             <Text className="text-xs font-medium text-background/50">Total balance</Text>
 
             <Text className="text-[32px] font-extrabold tracking-tight text-background">
-              ₹2,81,645
+              {formatPrice(totalBalance, currency)}
             </Text>
 
             {/* Income & Expense */}
@@ -65,33 +175,39 @@ export default function HomeTab() {
             </View>
 
             {/* Quick Actions */}
-            <View className="mt-5 flex-row gap-2 py-4">
+            <View className="mt-2 flex-row gap-2.5 py-4">
               {/* AI Receipt Scan */}
-              <Pressable className="min-h-[76px] flex-1 items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-1 py-3 active:bg-white/10">
-                <View className="mb-2 h-9 w-9 items-center justify-center rounded-full bg-blue-500/15">
-                  <Camera size={19} color="#60A5FA" />
+              <Pressable
+                accessibilityRole="button"
+                className="min-h-[84px] flex-1 items-center justify-center rounded-2xl border border-muted-foreground/20 bg-muted-foreground/15 px-1 py-3 active:bg-background/20 dark:border-muted-foreground/10 dark:bg-muted-foreground/5">
+                <View className="mb-2 h-11 w-11 items-center justify-center rounded-full border border-sky-400/30 bg-sky-500/20">
+                  <Camera size={20} color="#38BDF8" strokeWidth={2.2} />
                 </View>
-                <Text className="text-center text-[10px] font-medium text-background/80">
+                <Text className="text-center text-[10.5px] font-semibold leading-tight text-background">
                   AI Receipt Scan
                 </Text>
               </Pressable>
 
               {/* Voice Entry */}
-              <Pressable className="min-h-[76px] flex-1 items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-1 py-3 active:bg-white/10">
-                <View className="mb-2 h-9 w-9 items-center justify-center rounded-full bg-orange-500/15">
-                  <Mic size={19} color="#FB923C" />
+              <Pressable
+                accessibilityRole="button"
+                className="min-h-[84px] flex-1 items-center justify-center rounded-2xl border border-muted-foreground/20 bg-muted-foreground/15 px-1 py-3 active:bg-background/20 dark:border-muted-foreground/10 dark:bg-muted-foreground/5">
+                <View className="mb-2 h-11 w-11 items-center justify-center rounded-full border border-amber-400/30 bg-amber-500/20">
+                  <Mic size={20} color="#FB923C" strokeWidth={2.2} />
                 </View>
-                <Text className="text-center text-[10px] font-medium text-background/80">
+                <Text className="text-center text-[10.5px] font-semibold leading-tight text-background">
                   Voice Entry
                 </Text>
               </Pressable>
 
               {/* Add Manually */}
-              <Pressable className="min-h-[76px] flex-1 items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-1 py-3 active:bg-white/10">
-                <View className="mb-2 h-9 w-9 items-center justify-center rounded-full bg-green-500/15">
-                  <Plus size={20} color="#4ADE80" />
+              <Pressable
+                accessibilityRole="button"
+                className="min-h-[84px] flex-1 items-center justify-center rounded-2xl border border-muted-foreground/20 bg-muted-foreground/15 px-1 py-3 active:bg-background/20 dark:border-muted-foreground/10 dark:bg-muted-foreground/5">
+                <View className="mb-2 h-11 w-11 items-center justify-center rounded-full border border-emerald-400/30 bg-emerald-500/20">
+                  <Plus size={21} color="#34D399" strokeWidth={2.5} />
                 </View>
-                <Text className="text-center text-[10px] font-medium text-background/80">
+                <Text className="text-center text-[10.5px] font-semibold leading-tight text-background">
                   Add Manually
                 </Text>
               </Pressable>
@@ -108,29 +224,6 @@ export default function HomeTab() {
             placeholderTextColor={colors.mutedForeground}
           />
         </View>
-
-        {/* ===== FILTER CHIPS ===== */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          className="mt-4"
-          contentContainerStyle={{ paddingHorizontal: 20, gap: 8 }}>
-          {['All', 'House', 'Apartment', 'Villa'].map((item) => {
-            const selected = filter === item;
-            return (
-              <Pressable
-                key={item}
-                onPress={() => setFilter(item)}
-                className={`rounded-full border px-4 py-2 ${
-                  selected ? 'border-transparent bg-primary' : 'border-border bg-background'
-                }`}>
-                <Text className={selected ? 'text-primary-foreground' : 'text-foreground'}>
-                  {item}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
 
         {/* ===== PROPERTY CARD ===== */}
         <View className="mx-5 mt-6 overflow-hidden rounded-lg border border-border bg-card">
