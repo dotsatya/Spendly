@@ -1,4 +1,4 @@
-import { create } from "zustand";
+import { create } from 'zustand';
 
 interface UserStore {
   currency: string;
@@ -8,7 +8,7 @@ interface UserStore {
 }
 
 export const useUserStore = create<UserStore>((set) => ({
-  currency: "INR",
+  currency: 'INR',
   setCurrency: (value) => set({ currency: value }),
   needsOnboarding: null,
   setNeedsOnboarding: (value) => set({ needsOnboarding: value }),

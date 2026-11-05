@@ -65,7 +65,7 @@ export default function HomeTab() {
             </View>
 
             {/* Quick Actions */}
-            <View className="mt-5 py-4 flex-row gap-2">
+            <View className="mt-5 flex-row gap-2 py-4">
               {/* AI Receipt Scan */}
               <Pressable className="min-h-[76px] flex-1 items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-1 py-3 active:bg-white/10">
                 <View className="mb-2 h-9 w-9 items-center justify-center rounded-full bg-blue-500/15">

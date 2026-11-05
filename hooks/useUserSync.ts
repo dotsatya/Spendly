@@ -1,7 +1,7 @@
-import { useSupabase } from "@/hooks/useSupabase";
-import { useUserStore } from "@/store/userStore";
-import { useUser } from "@clerk/expo";
-import { useEffect } from "react";
+import { useSupabase } from '@/hooks/useSupabase';
+import { useUserStore } from '@/store/userStore';
+import { useUser } from '@clerk/expo';
+import { useEffect } from 'react';
 
 export const useUserSync = () => {
   const { user } = useUser();
@@ -10,66 +10,69 @@ export const useUserSync = () => {
   const authSupabase = useSupabase();
 
   useEffect(() => {
-    if (!user) return;
+    if (!user) {
+      setNeedsOnboarding(null);
+      return;
+    }
 
     const syncUser = async () => {
       try {
         const { data: existingUser, error: fetchError } = await authSupabase
-          .from("users")
-          .select("clerk_id, currency")
-          .eq("clerk_id", user.id)
+          .from('users')
+          .select('clerk_id, currency')
+          .eq('clerk_id', user.id)
           .single();
 
-        if (fetchError && fetchError.code !== "PGRST116") {
-          console.error("Error fetching user:", fetchError);
+        if (fetchError && fetchError.code !== 'PGRST116') {
+          console.error('Error fetching user:', fetchError);
           setNeedsOnboarding(true);
           return;
         }
 
         if (existingUser) {
-          setCurrency(existingUser.currency ?? "INR");
+          setCurrency(existingUser.currency ?? 'INR');
           setNeedsOnboarding(!existingUser.currency);
           return;
         }
 
-        const email = user.emailAddresses[0].emailAddress;
+        const email = user.emailAddresses[0]?.emailAddress ?? '';
 
         const { data: newUser, error: insertError } = await authSupabase
-          .from("users")
+          .from('users')
           .upsert(
             {
               clerk_id: user.id,
               email,
-              name: `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim(),
+              name: `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim(),
               image_url: user.imageUrl,
             },
-            { onConflict: "clerk_id", ignoreDuplicates: false }
+            { onConflict: 'clerk_id', ignoreDuplicates: false }
           )
-          .select("currency")
+          .select('currency')
           .single();
 
         if (insertError) {
-          console.error("Error upserting user:", insertError);
+          console.error('Error upserting user:', insertError);
           setNeedsOnboarding(true);
           return;
         }
 
-        setCurrency(newUser?.currency ?? "INR");
+        setCurrency(newUser?.currency ?? 'INR');
         setNeedsOnboarding(!newUser?.currency);
 
         const { error: accountError } = await authSupabase
-          .from("accounts")
-          .insert({ user_id: user.id, name: "Cash", type: "CASH", balance: 0, is_default: true });
+          .from('accounts')
+          .insert({ user_id: user.id, name: 'Cash', type: 'CASH', balance: 0, is_default: true });
 
         if (accountError) {
-          console.error("Error creating default account:", accountError);
+          console.error('Error creating default account:', accountError);
         }
       } catch (e) {
-        console.error("Unexpected sync error:", e);
+        console.error('Unexpected sync error:', e);
         setNeedsOnboarding(true);
       }
     };
 
     syncUser();
-  }, [user?.id]);
+  }, [user?.id, authSupabase, setCurrency, setNeedsOnboarding, user]);
 };

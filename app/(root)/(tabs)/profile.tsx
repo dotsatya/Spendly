@@ -71,6 +71,7 @@ export default function ProfileTab() {
   const router = useRouter();
   const { themePreference, resolvedTheme, isDark } = useAppTheme();
   const c = useThemeColors();
+  console.log(user);
 
   const fullName = user?.fullName || 'Spendly User';
   const email = user?.primaryEmailAddress?.emailAddress || 'No email available';
@@ -151,7 +152,7 @@ export default function ProfileTab() {
               </Text>
 
               <View className="mt-1 flex-row items-center">
-                <Ionicons name="mail-outline" size={13} className='text-white' />
+                <Ionicons name="mail-outline" size={13} className="text-white" />
                 <Text
                   numberOfLines={1}
                   className="ml-1.5 flex-1 text-xs text-primary-foreground opacity-70">
@@ -184,8 +185,8 @@ export default function ProfileTab() {
                       themePreference === 'system'
                         ? 'phone-portrait-outline'
                         : isDark
-                        ? 'moon-outline'
-                        : 'sunny-outline'
+                          ? 'moon-outline'
+                          : 'sunny-outline'
                     }
                     size={16}
                     color={c.foreground}
