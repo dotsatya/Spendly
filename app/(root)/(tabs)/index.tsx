@@ -1,9 +1,34 @@
 import { useMemo, useState } from 'react';
-import { View, Text, TextInput, Pressable, Switch, TouchableOpacity, Image } from 'react-native';
+import {
+  View,
+  Text,
+  TextInput,
+  Pressable,
+  Switch,
+  TouchableOpacity,
+  Image,
+  ActivityIndicator,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
 import { useThemeColors } from '@/lib/theme';
-import { ArrowUpRight, ArrowDownRight, Camera, Mic, Plus } from 'lucide-react-native';
+import {
+  ArrowUpRight,
+  ArrowDownRight,
+  Camera,
+  Mic,
+  Plus,
+  LucideIcon,
+  ArrowRight,
+  Edit2,
+  Inbox,
+  Sparkles,
+  Wallet,
+  PieChartIcon,
+  Pencil,
+  Target,
+  ChevronRight,
+  Receipt,
+} from 'lucide-react-native';
 import { useUser } from '@clerk/expo';
 import { router } from 'expo-router';
 import { useUserStore } from '@/store/userStore';
@@ -15,13 +40,53 @@ import { Transaction } from '@/types';
 import { getCategoryConfig } from '@/constants/categories';
 import { RefreshControl, ScrollView } from 'react-native-gesture-handler';
 import { formatPrice, getGreeting } from '@/lib/utils/utils';
+import { PieChart } from 'react-native-gifted-charts';
+import { TransactionRow } from '@/components/home/TransactionRow';
+import { BudgetModal } from '@/components/home/BudgetModal';
+import SectionHeader from '@/components/SectionHeader';
+
+type QuickAction = {
+  icon: LucideIcon;
+  label: string;
+  action: string;
+  color: string;
+  borderColor: string;
+  bgColor: string;
+};
+
+const QuickActions: QuickAction[] = [
+  {
+    icon: Camera,
+    label: 'AI Receipt Scan',
+    action: 'Scan',
+    color: '#38BDF8',
+    borderColor: 'border-sky-400/30',
+    bgColor: 'bg-sky-500/20',
+  },
+  {
+    icon: Mic,
+    label: 'Voice Entry',
+    action: 'Talk',
+    color: '#FB923C',
+    borderColor: 'border-amber-400/30',
+    bgColor: 'bg-amber-500/20',
+  },
+  {
+    icon: Plus,
+    label: 'Manual Entry',
+    action: 'Add',
+    color: '#34D399',
+    borderColor: 'border-emerald-400/30',
+    bgColor: 'bg-emerald-500/20',
+  },
+];
 
 export default function HomeTab() {
   const colors = useThemeColors(); // for icons, placeholder, switch
   const { user } = useUser();
   const currency = useUserStore((state) => state.currency);
 
-  const [budgetModelOpen, setBudgetModelOpen] = useState(false);
+  const [budgetModalOpen, setBudgetModalOpen] = useState(false);
   const [alerts, setAlerts] = useState(true);
 
   const {
@@ -105,6 +170,31 @@ export default function HomeTab() {
       .join('')
       .toUpperCase() || 'U';
 
+  //////////////////////////////////////
+  // Budget calculations
+
+  const budgetAmount = Number((budget as { amount?: number } | undefined)?.amount ?? 0);
+  const hasBudget = budgetAmount > 0;
+  const spentRatio = hasBudget ? monthlyExpense / budgetAmount : 0;
+  const spentPercent = Math.min(Math.round(spentRatio * 100), 100);
+  const remaining = budgetAmount - monthlyExpense;
+
+  const budgetState: 'ok' | 'warn' | 'over' =
+    spentRatio >= 1 ? 'over' : spentRatio >= 0.8 ? 'warn' : 'ok';
+
+  // Full class strings so NativeWind can see them at build time.
+  const BUDGET_STATE = {
+    ok: { label: 'On track', bar: 'bg-chart-2' },
+    warn: { label: 'Close to limit', bar: 'bg-chart-3' },
+    over: { label: 'Over budget', bar: 'bg-destructive' },
+  } as const;
+
+  const expenseTotal = useMemo(
+    () => expensesBreakdown.reduce((sum, c) => sum + c.amount, 0),
+    [expensesBreakdown]
+  );
+
+  //////////////////////////////////////
   return (
     // 1. Screen background
     <SafeAreaView className="flex-1 bg-background" edges={['top', 'left', 'right']}>
@@ -115,9 +205,9 @@ export default function HomeTab() {
         refreshControl={<RefreshControl refreshing={refetching} onRefresh={onRefresh} />}>
         {/* ===== HEADER ===== */}
 
-        <View className="overflow-hidden rounded-b-3xl bg-foreground">
+        <View className="overflow-hidden rounded-b-3xl bg-foreground px-5">
           {/* Header */}
-          <View className="flex-row items-center justify-between px-5 pb-5 pt-4">
+          <View className="flex-row items-center justify-between  pb-5 pt-4">
             {/* App Logo */}
             <View>
               <Text className="text-[28px] font-extrabold tracking-tight text-background">
@@ -132,7 +222,7 @@ export default function HomeTab() {
               <View className="items-end">
                 <Text className="text-[11px] font-medium text-background/60">{getGreeting()}</Text>
 
-                <Text className="text-lg font-bold text-chart-2">{user?.firstName}</Text>
+                <Text className="text-lg font-bold text-chart-2">{user?.firstName ?? 'User'}</Text>
               </View>
 
               {/* Avatar */}
@@ -154,7 +244,7 @@ export default function HomeTab() {
           </View>
 
           {/* Balance Overview */}
-          <View className="px-5 py-5">
+          <View className=" py-5">
             <Text className="text-xs font-medium text-background/50">Total balance</Text>
 
             <Text className="text-[32px] font-extrabold tracking-tight text-background">
@@ -165,120 +255,272 @@ export default function HomeTab() {
             <View className="mt-2 flex-row items-center gap-4">
               <View className="flex-row items-center gap-1">
                 <ArrowUpRight size={15} color="#4ADE80" />
-                <Text className="text-xs font-semibold text-green-400">₹15,944</Text>
+                <Text className="text-xs font-semibold text-green-400">
+                  {formatPrice(monthlyIncome, currency)}
+                </Text>
               </View>
 
               <View className="flex-row items-center gap-1">
                 <ArrowDownRight size={15} color="#F87171" />
-                <Text className="text-xs font-semibold text-red-400">₹30,899</Text>
+                <Text className="text-xs font-semibold text-red-400">
+                  {formatPrice(monthlyExpense, currency)}
+                </Text>
               </View>
             </View>
 
             {/* Quick Actions */}
             <View className="mt-2 flex-row gap-2.5 py-4">
-              {/* AI Receipt Scan */}
-              <Pressable
-                accessibilityRole="button"
-                className="min-h-[84px] flex-1 items-center justify-center rounded-2xl border border-muted-foreground/20 bg-muted-foreground/15 px-1 py-3 active:bg-background/20 dark:border-muted-foreground/10 dark:bg-muted-foreground/5">
-                <View className="mb-2 h-11 w-11 items-center justify-center rounded-full border border-sky-400/30 bg-sky-500/20">
-                  <Camera size={20} color="#38BDF8" strokeWidth={2.2} />
-                </View>
-                <Text className="text-center text-[10.5px] font-semibold leading-tight text-background">
-                  AI Receipt Scan
-                </Text>
-              </Pressable>
+              {QuickActions.map((action) => {
+                const Icon = action.icon;
 
-              {/* Voice Entry */}
-              <Pressable
-                accessibilityRole="button"
-                className="min-h-[84px] flex-1 items-center justify-center rounded-2xl border border-muted-foreground/20 bg-muted-foreground/15 px-1 py-3 active:bg-background/20 dark:border-muted-foreground/10 dark:bg-muted-foreground/5">
-                <View className="mb-2 h-11 w-11 items-center justify-center rounded-full border border-amber-400/30 bg-amber-500/20">
-                  <Mic size={20} color="#FB923C" strokeWidth={2.2} />
-                </View>
-                <Text className="text-center text-[10.5px] font-semibold leading-tight text-background">
-                  Voice Entry
-                </Text>
-              </Pressable>
+                return (
+                  <TouchableOpacity
+                    key={action.label}
+                    activeOpacity={0.8}
+                    onPress={() =>
+                      router.push({
+                        pathname: '/(root)/(tabs)/add-transaction',
+                        params: { action: action.action },
+                      })
+                    }
+                    className="min-h-[84px] flex-1 items-center justify-center rounded-2xl border border-muted-foreground/20 bg-muted-foreground/15 px-1 py-3 active:bg-background/20 ">
+                    <View
+                      className={`mb-2 h-11 w-11 items-center justify-center rounded-full border ${action.borderColor} ${action.bgColor}`}>
+                      <Icon size={20} color={action.color} strokeWidth={2.2} />
+                    </View>
 
-              {/* Add Manually */}
-              <Pressable
-                accessibilityRole="button"
-                className="min-h-[84px] flex-1 items-center justify-center rounded-2xl border border-muted-foreground/20 bg-muted-foreground/15 px-1 py-3 active:bg-background/20 dark:border-muted-foreground/10 dark:bg-muted-foreground/5">
-                <View className="mb-2 h-11 w-11 items-center justify-center rounded-full border border-emerald-400/30 bg-emerald-500/20">
-                  <Plus size={21} color="#34D399" strokeWidth={2.5} />
-                </View>
-                <Text className="text-center text-[10.5px] font-semibold leading-tight text-background">
-                  Add Manually
-                </Text>
-              </Pressable>
+                    <Text className="text-center text-[10.5px] font-semibold leading-tight text-background">
+                      {action.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           </View>
         </View>
 
-        {/* ===== SEARCH INPUT ===== */}
-        <View className="mx-5 mt-5 flex-row items-center rounded-md border border-input bg-background px-3">
-          <Ionicons name="search" size={18} color={colors.mutedForeground} />
-          <TextInput
-            className="ml-2 h-11 flex-1 text-foreground"
-            placeholder="Search city or area"
-            placeholderTextColor={colors.mutedForeground}
-          />
-        </View>
+        {/* ===== BODY ===== */}
 
-        {/* ===== PROPERTY CARD ===== */}
-        <View className="mx-5 mt-6 overflow-hidden rounded-lg border border-border bg-card">
-          {/* Image placeholder (skeleton color) */}
-          <View className="h-40 bg-muted" />
+        <View className="mt-8 gap-6 px-5">
+          {/* ===== AI ASSISTANT (slim row) ===== */}
+          <Pressable
+            onPress={() => router.push('/(root)/(tabs)/assistant')}
+            className="flex-row items-center gap-3 rounded-2xl border border-border bg-card p-4 active:bg-accent">
+            <View className="h-10 w-10 items-center justify-center rounded-full bg-chart-2/10">
+              <Sparkles size={18} color={colors.chart2} />
+            </View>
+            <View className="flex-1">
+              <Text className="text-sm font-semibold text-foreground">Ask AI about your money</Text>
+              <Text className="mt-0.5 text-xs text-muted-foreground">
+                Get answers on spending, savings and budgets.
+              </Text>
+            </View>
+            <ChevronRight size={18} color={colors.mutedForeground} />
+          </Pressable>
 
-          <View className="p-4">
-            <View className="flex-row items-center justify-between">
-              <Text className="text-lg font-semibold text-card-foreground">2 BHK Apartment</Text>
+          {/* ===== MONTHLY BUDGET (main card) ===== */}
+          <View>
+            <SectionHeader
+              title="Monthly budget"
+              right={
+                <Pressable
+                  onPress={() => setBudgetModalOpen(true)}
+                  className="flex-row items-center gap-1.5 rounded-full bg-chart-2/10 px-3 py-1 active:bg-chart-2/20">
+                  <Pencil size={13} color={colors.chart2} strokeWidth={2.4} />
+                  <Text className="text-sm font-semibold text-chart-2">Edit</Text>
+                </Pressable>
+              }
+            />
+            <Pressable
+              onPress={() => setBudgetModalOpen(true)}
+              className="rounded-2xl border border-border bg-card px-5 py-4 active:bg-accent">
+              {hasBudget ? (
+                <>
+                  <View className="flex-row items-end justify-between">
+                    <View className="flex-row items-baseline gap-1.5">
+                      <Text
+                        className={`mt-1 text-[32px] font-extrabold tracking-tight ${
+                          remaining >= 0 ? 'text-foreground' : 'text-destructive'
+                        }`}>
+                        {formatPrice(Math.abs(remaining), currency)}
+                      </Text>
+                      <Text
+                        className={`text-[11px] font-semibold ${
+                          remaining >= 0 ? 'text-muted-foreground' : 'text-destructive'
+                        }`}>
+                        {remaining >= 0 ? 'Left to spend' : 'Over budget'}
+                      </Text>
+                    </View>
+                    <View className="items-end pb-1">
+                      <Text className="text-xs font-medium text-muted-foreground">Spent</Text>
+                      <Text className="mt-1 text-base font-bold text-foreground">
+                        {formatPrice(monthlyExpense, currency)}
+                      </Text>
+                    </View>
+                  </View>
+                  {/* Progress */}
+                  <View className="mt-4 h-2.5 overflow-hidden rounded-full bg-secondary">
+                    <View
+                      className={`h-full rounded-full ${BUDGET_STATE[budgetState].bar}`}
+                      style={{ width: `${Math.max(spentPercent, 2)}%` }}
+                    />
+                  </View>
 
-              {/* Outline badge */}
-              <View className="rounded-full border border-border px-2.5 py-0.5">
-                <Text className="text-xs text-foreground">New</Text>
+                  <View className="mt-3 flex-row items-center justify-between">
+                    <Text className="text-xs text-muted-foreground">
+                      {formatPrice(monthlyExpense, currency)} of
+                      {formatPrice(budgetAmount, currency)}
+                    </Text>
+                    <View className="flex-row items-center gap-1.5 rounded-full bg-secondary px-2.5 py-1">
+                      <View
+                        className={`h-1.5 w-1.5 rounded-full ${BUDGET_STATE[budgetState].bar}`}
+                      />
+                      <Text className="text-[11px] font-semibold text-foreground">
+                        {BUDGET_STATE[budgetState].label} · {spentPercent}%
+                      </Text>
+                    </View>
+                  </View>
+                </>
+              ) : (
+                /* empty state: unchanged except the mt-4 block below stays the same */
+                <View className="mt-4 flex-row items-center gap-3 rounded-2xl border border-dashed border-border p-4">
+                  <View className="h-10 w-10 items-center justify-center rounded-full bg-chart-2/10">
+                    <Target size={18} color={colors.chart2} />
+                  </View>
+                  <View className="flex-1">
+                    <Text className="text-sm font-semibold text-foreground">
+                      Set a monthly budget
+                    </Text>
+                    <Text className="mt-0.5 text-xs text-muted-foreground">
+                      See how much you can still spend this month.
+                    </Text>
+                  </View>
+                  <ChevronRight size={18} color={colors.mutedForeground} />
+                </View>
+              )}
+            </Pressable>
+          </View>
+
+          {/* ===== SPENDING BY CATEGORY ===== */}
+          {expensesBreakdown.length > 0 && (
+            <View>
+              <SectionHeader
+                title="Spending by category"
+                right={
+                  <Text className="text-sm font-semibold text-muted-foreground">This month</Text>
+                }
+              />
+              <View className="rounded-2xl border border-border bg-card p-5">
+                {/* Donut, centered */}
+                <View className="items-center">
+                  <PieChart
+                    donut
+                    data={expensesBreakdown.map((c) => ({ value: c.amount, color: c.color }))}
+                    radius={70}
+                    innerRadius={50}
+                    innerCircleColor={colors.card}
+                    centerLabelComponent={() => (
+                      <View className="items-center" style={{ width: 80 }}>
+                        <Text className="text-[10px] text-muted-foreground">Total</Text>
+                        <Text
+                          className="text-xs font-bold text-foreground"
+                          numberOfLines={1}
+                          adjustsFontSizeToFit>
+                          {formatPrice(expenseTotal, currency)}
+                        </Text>
+                      </View>
+                    )}
+                  />
+                </View>
+
+                {/* Legend, one line per category */}
+                <View className="mt-5 gap-3">
+                  {expensesBreakdown.slice(0, 5).map((c) => (
+                    <View key={c.category} className="flex-row items-center">
+                      <View
+                        className="mr-2 h-2.5 w-2.5 rounded-full"
+                        style={{ backgroundColor: c.color }}
+                      />
+                      <Text
+                        className="flex-1 text-xs font-medium text-foreground"
+                        numberOfLines={1}>
+                        {getCategoryConfig(c.category).label}
+                      </Text>
+                      <Text className="text-xs font-semibold text-foreground">
+                        {formatPrice(c.amount, currency)}
+                      </Text>
+                      <Text className="w-10 text-right text-xs text-muted-foreground">
+                        {expenseTotal > 0 ? Math.round((c.amount / expenseTotal) * 100) : 0}%
+                      </Text>
+                    </View>
+                  ))}
+                </View>
               </View>
             </View>
+          )}
 
-            <Text className="mt-1 text-sm text-muted-foreground">Salt Lake, Kolkata</Text>
+          {/* ===== RECENT TRANSACTIONS ===== */}
+          <View>
+            <SectionHeader
+              title="Recent transactions"
+              right={
+                <Pressable onPress={() => router.push('/(root)/(tabs)/transactions')} hitSlop={10}>
+                  <Text className="text-sm font-semibold text-chart-2">See all</Text>
+                </Pressable>
+              }
+            />
 
-            {/* Price = orange accent */}
-            <Text className="mt-3 text-xl font-semibold text-chart-2">₹ 18,000 / month</Text>
-
-            {/* Progress bar (example: 70% booked) */}
-            <View className="mt-4 h-1.5 overflow-hidden rounded-full bg-muted">
-              <View className="h-full w-[70%] rounded-full bg-chart-3" />
-            </View>
+            {loading ? (
+              <View className="overflow-hidden rounded-2xl border border-border bg-card">
+                {[0, 1, 2].map((i) => (
+                  <View key={i}>
+                    {i > 0 && <View className="mx-4 h-px bg-border" />}
+                    <View className="flex-row items-center gap-3 p-4">
+                      <View className="h-11 w-11 rounded-2xl bg-muted" />
+                      <View className="flex-1 gap-2">
+                        <View className="h-3 w-1/2 rounded-full bg-muted" />
+                        <View className="h-2.5 w-1/3 rounded-full bg-muted" />
+                      </View>
+                      <View className="h-3 w-16 rounded-full bg-muted" />
+                    </View>
+                  </View>
+                ))}
+              </View>
+            ) : recentTransactions.length === 0 ? (
+              <View className="items-center rounded-2xl border border-dashed border-border bg-card px-6 py-8">
+                <View className="h-14 w-14 items-center justify-center rounded-full bg-secondary">
+                  <Receipt size={24} color={colors.mutedForeground} />
+                </View>
+                <Text className="mt-4 text-base font-bold text-foreground">
+                  No transactions yet
+                </Text>
+                <Text className="mt-1 text-center text-xs leading-5 text-muted-foreground">
+                  Add your first expense by scan, voice or manual entry.
+                </Text>
+                <Pressable
+                  onPress={() => router.push('/(root)/(tabs)/add-transaction')}
+                  className="mt-5 h-11 items-center justify-center rounded-full bg-primary px-6 active:opacity-90">
+                  <Text className="text-sm font-bold text-primary-foreground">Add transaction</Text>
+                </Pressable>
+              </View>
+            ) : (
+              <View>
+                {recentTransactions.map((tx) => (
+                  <TransactionRow key={tx.id} tx={tx} />
+                ))}
+              </View>
+            )}
           </View>
-
-          {/* Card footer with buttons */}
-          <View className="flex-row gap-3 border-t border-border p-4">
-            {/* Outline button */}
-            <Pressable className="flex-1 items-center rounded-md border border-input bg-background py-3 active:bg-accent">
-              <Text className="font-medium text-foreground">Save</Text>
-            </Pressable>
-
-            {/* Main button */}
-            <Pressable className="flex-1 items-center rounded-md bg-primary py-3 active:bg-primary/90">
-              <Text className="font-medium text-primary-foreground">Contact</Text>
-            </Pressable>
-          </View>
-        </View>
-
-        {/* ===== SETTINGS ROW ===== */}
-        <View className="mx-5 mt-6 flex-row items-center justify-between rounded-lg border border-border bg-card p-4">
-          <View className="flex-1 pr-4">
-            <Text className="font-medium text-card-foreground">New listing alerts</Text>
-            <Text className="text-sm text-muted-foreground">Get notified for new homes</Text>
-          </View>
-          <Switch
-            value={alerts}
-            onValueChange={setAlerts}
-            trackColor={{ false: colors.input, true: colors.chart2 }}
-            thumbColor="#FFFFFF"
-          />
         </View>
       </ScrollView>
+      {/* {user && (
+        <BudgetModal
+          visible={budgetModalOpen}
+          budget={budget}
+          onClose={() => setBudgetModalOpen(false)}
+          onSaved={() => setBudgetModalOpen(false)}
+        />
+      )} */}
     </SafeAreaView>
   );
 }
