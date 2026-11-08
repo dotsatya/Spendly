@@ -180,13 +180,14 @@ export default function HomeTab() {
   const remaining = budgetAmount - monthlyExpense;
 
   const budgetState: 'ok' | 'warn' | 'over' =
-    spentRatio >= 1 ? 'over' : spentRatio >= 0.8 ? 'warn' : 'ok';
+    spentRatio >= 1 ? 'over' : spentRatio >= 0.7 ? 'warn' : 'ok';
 
   // Full class strings so NativeWind can see them at build time.
+  // Full class strings so NativeWind can see them at build time.
   const BUDGET_STATE = {
-    ok: { label: 'On track', bar: 'bg-chart-2' },
-    warn: { label: 'Close to limit', bar: 'bg-chart-3' },
-    over: { label: 'Over budget', bar: 'bg-destructive' },
+    ok: { label: 'On track', bar: 'bg-green-400' },
+    warn: { label: 'Close to limit', bar: 'bg-amber-400' },
+    over: { label: 'Over budget', bar: 'bg-red-400' },
   } as const;
 
   const expenseTotal = useMemo(
@@ -348,7 +349,7 @@ export default function HomeTab() {
                         className={`text-[11px] font-semibold ${
                           remaining >= 0 ? 'text-muted-foreground' : 'text-destructive'
                         }`}>
-                        {remaining >= 0 ? 'Left to spend' : 'Over budget'}
+                        {remaining >= 0 ? 'Available to spend' : 'Overspent'}
                       </Text>
                     </View>
                     <View className="items-end pb-1">
@@ -359,7 +360,7 @@ export default function HomeTab() {
                     </View>
                   </View>
                   {/* Progress */}
-                  <View className="mt-4 h-2.5 overflow-hidden rounded-full bg-secondary">
+                  <View className="mt-3 h-2.5 overflow-hidden rounded-full bg-secondary">
                     <View
                       className={`h-full rounded-full ${BUDGET_STATE[budgetState].bar}`}
                       style={{ width: `${Math.max(spentPercent, 2)}%` }}
@@ -367,9 +368,11 @@ export default function HomeTab() {
                   </View>
 
                   <View className="mt-3 flex-row items-center justify-between">
-                    <Text className="text-xs text-muted-foreground">
-                      {formatPrice(monthlyExpense, currency)} of
-                      {formatPrice(budgetAmount, currency)}
+                    <Text className="rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-muted-foreground">
+                      Monthly budget -{' '}
+                      <Text className="font-bold text-foreground">
+                        {formatPrice(budgetAmount, currency)}
+                      </Text>
                     </Text>
                     <View className="flex-row items-center gap-1.5 rounded-full bg-secondary px-2.5 py-1">
                       <View
@@ -383,7 +386,7 @@ export default function HomeTab() {
                 </>
               ) : (
                 /* empty state: unchanged except the mt-4 block below stays the same */
-                <View className="mt-4 flex-row items-center gap-3 rounded-2xl border border-dashed border-border p-4">
+                <View className="flex-row items-center gap-3 rounded-2xl border border-dashed border-border p-4">
                   <View className="h-10 w-10 items-center justify-center rounded-full bg-chart-2/10">
                     <Target size={18} color={colors.chart2} />
                   </View>
@@ -513,14 +516,14 @@ export default function HomeTab() {
           </View>
         </View>
       </ScrollView>
-      {/* {user && (
+      {user && (
         <BudgetModal
           visible={budgetModalOpen}
           budget={budget}
           onClose={() => setBudgetModalOpen(false)}
           onSaved={() => setBudgetModalOpen(false)}
         />
-      )} */}
+      )}
     </SafeAreaView>
   );
 }

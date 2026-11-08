@@ -50,7 +50,7 @@ export default function ProfileUserCard() {
             <Ionicons name="mail-outline" size={13} color={colors.background} />
             <Text
               numberOfLines={1}
-              className="ml-1.5 flex-1 text-xs text-primary-foreground opacity-70">
+              className="ml-1.5 flex-1 text-sm text-primary-foreground ">
               {email}
             </Text>
           </View>

@@ -60,7 +60,7 @@ export function TransactionRow({ tx, onDelete }: { tx: Transaction; onDelete?: (
         className={`text-sm font-bold ${
           isIncome ? 'text-green-600 dark:text-green-400' : 'text-destructive'
         }`}>
-        {isIncome ? '+' : '-'}
+        {isIncome ? '+ ' : '- '}
         {formatPrice(tx.amount, currency)}
       </Text>
     </View>
