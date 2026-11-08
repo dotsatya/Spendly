@@ -105,7 +105,7 @@ export default function HomeTab() {
     isError: transactionsError,
   } = useTransactionsQuery();
 
-  const { data: budget = [], refetch: refetchBudget, isError: budgetError } = useBudgetQuery();
+  const { data: budget, refetch: refetchBudget, isError: budgetError } = useBudgetQuery();
 
   const loading = accountsLoading || transactionsLoading;
   const refetching = accountsRefetching || transactionsRefetching;
@@ -173,7 +173,7 @@ export default function HomeTab() {
   //////////////////////////////////////
   // Budget calculations
 
-  const budgetAmount = Number((budget as { amount?: number } | undefined)?.amount ?? 0);
+  const budgetAmount = Number(budget?.amount ?? 0);
   const hasBudget = budgetAmount > 0;
   const spentRatio = hasBudget ? monthlyExpense / budgetAmount : 0;
   const spentPercent = Math.min(Math.round(spentRatio * 100), 100);
@@ -519,7 +519,7 @@ export default function HomeTab() {
       {user && (
         <BudgetModal
           visible={budgetModalOpen}
-          budget={budget}
+          budget={budget ?? null}
           onClose={() => setBudgetModalOpen(false)}
           onSaved={() => setBudgetModalOpen(false)}
         />

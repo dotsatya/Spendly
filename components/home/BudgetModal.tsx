@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Text, TextInput, View } from 'react-native';
 import { Budget } from '@/lib/services/budgets';
 import { useUpsertBudget } from '@/hooks/mutation/useBudgetMutations';
@@ -17,20 +17,26 @@ export function BudgetModal({
   onClose: () => void;
   onSaved: () => void;
 }) {
+  return (
+    <FormSheetModal
+      visible={visible}
+      title={budget ? 'Edit monthly budget' : 'Set monthly budget'}
+      subtitle="We use this to show how much you can still spend each month."
+      onClose={onClose}>
+      <BudgetForm budget={budget} onSaved={onSaved} />
+    </FormSheetModal>
+  );
+}
+
+function BudgetForm({ budget, onSaved }: { budget: Budget | null; onSaved: () => void }) {
   const colors = useThemeColors();
   const currency = useUserStore((state) => state.currency);
 
-  const [amount, setAmount] = useState('');
+  // Initial value comes from props, so there is no need to sync it in an effect.
+  const [amount, setAmount] = useState(budget ? String(budget.amount) : '');
   const [error, setError] = useState('');
   const [focused, setFocused] = useState(false);
   const { mutateAsync: upsertBudget, isPending: saving } = useUpsertBudget();
-
-  useEffect(() => {
-    if (visible) {
-      setAmount(budget ? String(budget.amount) : '');
-      setError('');
-    }
-  }, [visible, budget]);
 
   const handleSave = async () => {
     const parsedAmount = parseFloat(amount.replace(/,/g, ''));
@@ -54,11 +60,7 @@ export function BudgetModal({
   const borderClass = error ? 'border-destructive' : focused ? 'border-chart-2' : 'border-input';
 
   return (
-    <FormSheetModal
-      visible={visible}
-      title={budget ? 'Edit monthly budget' : 'Set monthly budget'}
-      subtitle="We use this to show how much you can still spend each month."
-      onClose={onClose}>
+    <>
       <FormField label="Monthly budget" error={error}>
         <View
           className={`h-14 flex-row items-center rounded-2xl border bg-muted/40 px-4 ${borderClass}`}>
@@ -85,6 +87,6 @@ export function BudgetModal({
         onPress={handleSave}
         loading={saving}
       />
-    </FormSheetModal>
+    </>
   );
 }

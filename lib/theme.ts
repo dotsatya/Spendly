@@ -32,7 +32,7 @@ export const THEME = {
   dark: {
     background: '#0C0A09',
     foreground: '#FBFAF9',
-    card: '#1D1816',
+    card: '#0A0604',
     cardForeground: '#FBFAF9',
     popover: '#1D1816',
     popoverForeground: '#FBFAF9',
